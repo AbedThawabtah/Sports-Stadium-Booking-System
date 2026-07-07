@@ -55,9 +55,11 @@ public class Stadium {
     @Column(nullable = false)
     private StadiumStatus status = StadiumStatus.PENDING_APPROVAL;
 
+    @Builder.Default
     @Column(name = "average_rating", precision = 3, scale = 2)
     private BigDecimal averageRating = BigDecimal.ZERO;
 
+    @Builder.Default
     @Column(name = "total_reviews", nullable = false)
     private Integer totalReviews = 0;
 

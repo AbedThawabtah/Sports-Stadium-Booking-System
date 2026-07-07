@@ -1,11 +1,11 @@
 package org.example.sportstadiumbookingsystem.security;
 
-
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -16,6 +16,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -26,6 +27,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
     private final CustomUserDetailsService userDetailsService;
 
+
+
     @Override
     protected void doFilterInternal(@NonNull HttpServletRequest request,
                                     @NonNull HttpServletResponse response,
@@ -34,6 +37,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String authHeader = request.getHeader(AUTH_HEADER);
 
         if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
+            log.warn("No Bearer token found for request: {} {}", request.getMethod(), request.getRequestURI());
             filterChain.doFilter(request, response);
             return;
         }
@@ -46,7 +50,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = userDetailsService.loadUserByUsername(email);
 
-                if (jwtService.isTokenValid(token, userDetails) && jwtService.isAccessToken(token)) {
+                boolean valid = jwtService.isTokenValid(token, userDetails);
+                boolean isAccess = jwtService.isAccessToken(token);
+                log.info("Token check -> email: {}, valid: {}, isAccessToken: {}, authorities: {}",
+                        email, valid, isAccess, userDetails.getAuthorities());
+
+                if (valid && isAccess) {
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                             userDetails, null, userDetails.getAuthorities());
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
@@ -54,9 +63,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
             }
         } catch (Exception ex) {
-            // توكن غير صالح/منتهي/تالف: منسيب الـ request بدون توثيق
-            // Spring Security رح يرجع 401/403 تلقائياً لو الـ endpoint محتاج توثيق
+            log.error("JWT authentication failed: {} - {}", ex.getClass().getSimpleName(), ex.getMessage());
             SecurityContextHolder.clearContext();
+
         }
 
         filterChain.doFilter(request, response);

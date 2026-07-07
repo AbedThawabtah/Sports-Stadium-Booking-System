@@ -5,11 +5,17 @@ import lombok.RequiredArgsConstructor;
 import org.example.sportstadiumbookingsystem.dto.stadium.StadiumRequest;
 import org.example.sportstadiumbookingsystem.dto.stadium.StadiumResponse;
 import org.example.sportstadiumbookingsystem.service.StadiumService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -27,8 +33,24 @@ public class StadiumController {
     }
 
     @GetMapping
-    public ResponseEntity<List<StadiumResponse>> getAllActiveStadiums() {
-        List<StadiumResponse> stadiums = stadiumService.getAllActiveStadiums();
+    public ResponseEntity<Page<StadiumResponse>> searchStadiums(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String city,
+            @RequestParam(required = false) String sportType,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @PageableDefault(size = 10) Pageable pageable) {
+
+        Page<StadiumResponse> stadiums = stadiumService.searchStadiums(
+                keyword, city, sportType, minPrice, maxPrice, date, pageable);
+        return ResponseEntity.ok(stadiums);
+    }
+
+    @GetMapping("/my-stadiums")
+    @PreAuthorize("hasRole('STADIUM_OWNER')")
+    public ResponseEntity<List<StadiumResponse>> getMyStadiums() {
+        List<StadiumResponse> stadiums = stadiumService.getMyStadiums();
         return ResponseEntity.ok(stadiums);
     }
 
