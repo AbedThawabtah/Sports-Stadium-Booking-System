@@ -2,6 +2,7 @@ package org.example.sportstadiumbookingsystem.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.example.sportstadiumbookingsystem.dto.stadium.MyStadiumResponse;
 import org.example.sportstadiumbookingsystem.dto.stadium.StadiumRequest;
 import org.example.sportstadiumbookingsystem.dto.stadium.StadiumResponse;
 import org.example.sportstadiumbookingsystem.service.StadiumService;
@@ -49,8 +50,8 @@ public class StadiumController {
 
     @GetMapping("/my-stadiums")
     @PreAuthorize("hasRole('STADIUM_OWNER')")
-    public ResponseEntity<List<StadiumResponse>> getMyStadiums() {
-        List<StadiumResponse> stadiums = stadiumService.getMyStadiums();
+    public ResponseEntity<List<MyStadiumResponse>> getMyStadiums() {
+        List<MyStadiumResponse> stadiums = stadiumService.getMyStadiums();
         return ResponseEntity.ok(stadiums);
     }
 

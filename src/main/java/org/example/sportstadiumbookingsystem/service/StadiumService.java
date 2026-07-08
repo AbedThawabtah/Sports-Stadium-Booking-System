@@ -2,11 +2,14 @@ package org.example.sportstadiumbookingsystem.service;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.example.sportstadiumbookingsystem.dto.stadium.MyStadiumResponse;
 import org.example.sportstadiumbookingsystem.dto.stadium.StadiumRequest;
 import org.example.sportstadiumbookingsystem.dto.stadium.StadiumResponse;
 import org.example.sportstadiumbookingsystem.entity.Stadium;
 import org.example.sportstadiumbookingsystem.entity.User;
+import org.example.sportstadiumbookingsystem.entityEnums.ReservationStatus;
 import org.example.sportstadiumbookingsystem.entityEnums.StadiumStatus;
+import org.example.sportstadiumbookingsystem.repository.ReservationRepository;
 import org.example.sportstadiumbookingsystem.repository.StadiumRepository;
 import org.example.sportstadiumbookingsystem.repository.UserRepository;
 import org.example.sportstadiumbookingsystem.specification.StadiumSpecifications;
@@ -29,6 +32,7 @@ public class StadiumService {
     private final StadiumRepository stadiumRepository;
     private final UserRepository userRepository;
     private final ActivityLogService activityLogService;
+    private final ReservationRepository reservationRepository;
 
     public StadiumResponse createStadium(StadiumRequest request) {
         User owner = getCurrentUser();
@@ -79,11 +83,11 @@ public class StadiumService {
         return stadiumRepository.findAll(spec, pageable).map(this::toResponse);
     }
 
-    public List<StadiumResponse> getMyStadiums() {
+    public List<MyStadiumResponse> getMyStadiums() {
         User owner = getCurrentUser();
         return stadiumRepository.findByOwnerId(owner.getId())
                 .stream()
-                .map(this::toResponse)
+                .map(this::toMyStadiumResponse)
                 .toList();
     }
 
@@ -160,6 +164,24 @@ public class StadiumService {
                 .createdAt(stadium.getCreatedAt())
                 .ownerId(stadium.getOwner().getId())
                 .ownerName(stadium.getOwner().getFullName())
+                .build();
+    }
+
+    private MyStadiumResponse toMyStadiumResponse(Stadium stadium) {
+        Long stadiumId = stadium.getId();
+        return MyStadiumResponse.builder()
+                .id(stadium.getId())
+                .name(stadium.getName())
+                .city(stadium.getCity())
+                .sportType(stadium.getSportType())
+                .pricePerHour(stadium.getPricePerHour())
+                .status(stadium.getStatus())
+                .averageRating(stadium.getAverageRating() != null ? stadium.getAverageRating().doubleValue() : 0.0)
+                .totalReviews(stadium.getTotalReviews())
+                .totalReservations(reservationRepository.countByStadiumId(stadiumId))
+                .confirmedReservations(reservationRepository.countByStadiumIdAndStatus(stadiumId, ReservationStatus.CONFIRMED))
+                .cancelledReservations(reservationRepository.countByStadiumIdAndStatus(stadiumId, ReservationStatus.CANCELLED))
+                .completedReservations(reservationRepository.countByStadiumIdAndStatus(stadiumId, ReservationStatus.COMPLETED))
                 .build();
     }
 

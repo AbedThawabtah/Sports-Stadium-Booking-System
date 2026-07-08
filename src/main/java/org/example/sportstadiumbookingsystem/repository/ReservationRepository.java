@@ -18,6 +18,10 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
 
     long countByStatus(ReservationStatus status);
 
+    long countByStadiumId(Long stadiumId);
+
+    long countByStadiumIdAndStatus(Long stadiumId, ReservationStatus status);
+
     @Query("select coalesce(sum(r.totalPrice), 0) from Reservation r where r.status = :status")
     BigDecimal sumTotalPriceByStatus(@Param("status") ReservationStatus status);
 
