@@ -24,9 +24,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -36,6 +34,7 @@ public class TimeSlotService {
     private final StadiumRepository stadiumRepository;
     private final WorkingHourRepository workingHourRepository;
     private final UserRepository userRepository;
+    private final StadiumService stadiumService;
 
     @Transactional
     public List<TimeSlotResponse> generateTimeSlots(Long stadiumId, GenerateTimeSlotsRequest request) {
@@ -73,7 +72,8 @@ public class TimeSlotService {
     }
 
     public List<TimeSlotResponse> getAvailableSlots(Long stadiumId, LocalDate date) {
-        findStadiumOrThrow(stadiumId);
+        Stadium stadium = findStadiumOrThrow(stadiumId);
+        stadiumService.assertStadiumViewable(stadium);
 
         List<TimeSlot> slots = timeSlotRepository
                 .findByStadiumIdAndSlotDateAndStatusOrderByStartTimeAsc(stadiumId, date, SlotStatus.AVAILABLE);
@@ -120,31 +120,49 @@ public class TimeSlotService {
                     "Invalid working hours for " + dayOfWeek);
         }
 
-        Set<LocalTime> existingStartTimes = new HashSet<>();
-        timeSlotRepository.findByStadiumIdAndSlotDateOrderByStartTimeAsc(stadium.getId(), date)
-                .forEach(slot -> existingStartTimes.add(slot.getStartTime()));
+        List<TimeSlot> existingSlots =
+                timeSlotRepository.findByStadiumIdAndSlotDateOrderByStartTimeAsc(stadium.getId(), date);
 
         BigDecimal pricePerSlot = stadium.getPricePerHour()
                 .multiply(BigDecimal.valueOf(duration))
                 .divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
 
         List<TimeSlot> toCreate = new ArrayList<>();
+        List<String> conflicts = new ArrayList<>();
         LocalTime cursor = openTime;
 
         while (!cursor.plusMinutes(duration).isAfter(closeTime) && cursor.plusMinutes(duration).isAfter(cursor)) {
+            LocalTime slotStart = cursor;
             LocalTime slotEnd = cursor.plusMinutes(duration);
 
-            if (!existingStartTimes.contains(cursor)) {
-                toCreate.add(TimeSlot.builder()
-                        .stadium(stadium)
-                        .slotDate(date)
-                        .startTime(cursor)
-                        .endTime(slotEnd)
-                        .status(SlotStatus.AVAILABLE)
-                        .price(pricePerSlot)
-                        .build());
+            boolean exactMatch = existingSlots.stream()
+                    .anyMatch(existing -> existing.getStartTime().equals(slotStart)
+                            && existing.getEndTime().equals(slotEnd));
+
+            if (!exactMatch) {
+                boolean overlapsExisting = existingSlots.stream()
+                        .anyMatch(existing -> existing.getStartTime().isBefore(slotEnd)
+                                && existing.getEndTime().isAfter(slotStart));
+
+                if (overlapsExisting) {
+                    conflicts.add(slotStart + "-" + slotEnd);
+                } else {
+                    toCreate.add(TimeSlot.builder()
+                            .stadium(stadium)
+                            .slotDate(date)
+                            .startTime(slotStart)
+                            .endTime(slotEnd)
+                            .status(SlotStatus.AVAILABLE)
+                            .price(pricePerSlot)
+                            .build());
+                }
             }
             cursor = slotEnd;
+        }
+
+        if (!conflicts.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Cannot generate slots for " + date + ": conflicts with existing slot(s) at " + String.join(", ", conflicts));
         }
 
         return toCreate.isEmpty() ? List.of() : timeSlotRepository.saveAll(toCreate);

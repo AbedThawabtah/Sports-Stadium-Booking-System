@@ -102,6 +102,13 @@
             <version>2.6.0</version>
         </dependency>
 
+        <!-- Apache Tika: magic-byte MIME detection for uploaded files -->
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-core</artifactId>
+            <version>2.9.2</version>
+        </dependency>
+
         <!-- Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

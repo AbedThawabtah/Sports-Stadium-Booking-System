@@ -36,13 +36,23 @@ public class AuthenticationService {
                 .email(request.getEmail())
                 .phoneNumber(request.getPhoneNumber())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
-                .role(request.getRole() != null ? request.getRole() : UserRole.CUSTOMER)
+                .role(resolveSelfRegistrationRole(request.getRole()))
                 .isActive(true)
                 .build();
 
         User savedUser = userRepository.save(user);
 
         return buildAuthResponse(savedUser);
+    }
+
+    private UserRole resolveSelfRegistrationRole(UserRole requestedRole) {
+        if (requestedRole == null) {
+            return UserRole.CUSTOMER;
+        }
+        if (requestedRole == UserRole.CUSTOMER || requestedRole == UserRole.STADIUM_OWNER) {
+            return requestedRole;
+        }
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid role for self-registration");
     }
 
     public AuthResponse login(LoginRequest request) {

@@ -9,6 +9,7 @@ import org.example.sportstadiumbookingsystem.entity.Stadium;
 import org.example.sportstadiumbookingsystem.entity.User;
 import org.example.sportstadiumbookingsystem.entityEnums.ReservationStatus;
 import org.example.sportstadiumbookingsystem.entityEnums.StadiumStatus;
+import org.example.sportstadiumbookingsystem.entityEnums.UserRole;
 import org.example.sportstadiumbookingsystem.repository.ReservationRepository;
 import org.example.sportstadiumbookingsystem.repository.StadiumRepository;
 import org.example.sportstadiumbookingsystem.repository.UserRepository;
@@ -93,7 +94,28 @@ public class StadiumService {
 
     public StadiumResponse getStadiumById(Long id) {
         Stadium stadium = findStadiumOrThrow(id);
+        assertStadiumViewable(stadium);
         return toResponse(stadium);
+    }
+
+    public void assertStadiumViewable(Stadium stadium) {
+        if (stadium.getStatus() == StadiumStatus.ACTIVE) {
+            return;
+        }
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        boolean isAnonymous = authentication == null
+                || !authentication.isAuthenticated()
+                || "anonymousUser".equals(authentication.getPrincipal());
+        if (isAnonymous) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Stadium not found");
+        }
+        User currentUser = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Stadium not found"));
+        boolean isAdmin = currentUser.getRole() == UserRole.ADMIN;
+        boolean isOwner = stadium.getOwner().getId().equals(currentUser.getId());
+        if (!isAdmin && !isOwner) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Stadium not found");
+        }
     }
 
     public StadiumResponse updateStadium(Long id, StadiumRequest request) {

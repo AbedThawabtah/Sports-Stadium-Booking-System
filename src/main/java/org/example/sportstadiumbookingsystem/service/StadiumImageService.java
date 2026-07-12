@@ -29,6 +29,7 @@ public class StadiumImageService {
     private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
     private final ActivityLogService activityLogService;
+    private final StadiumService stadiumService;
 
     @Transactional
     public List<StadiumImageResponse> uploadImages(Long stadiumId, List<MultipartFile> files) {
@@ -69,7 +70,8 @@ public class StadiumImageService {
     }
 
     public List<StadiumImageResponse> getImages(Long stadiumId) {
-        findStadiumOrThrow(stadiumId);
+        Stadium stadium = findStadiumOrThrow(stadiumId);
+        stadiumService.assertStadiumViewable(stadium);
         return stadiumImageRepository.findByStadiumIdOrderByIsPrimaryDescCreatedAtAsc(stadiumId)
                 .stream()
                 .map(this::toResponse)

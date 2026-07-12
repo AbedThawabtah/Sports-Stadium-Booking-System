@@ -37,6 +37,7 @@ public class ReviewService {
     private final StadiumRepository stadiumRepository;
     private final UserRepository userRepository;
     private final ActivityLogService activityLogService;
+    private final StadiumService stadiumService;
 
     @Transactional
     public ReviewResponse submitReview(ReviewRequest request) {
@@ -85,6 +86,10 @@ public class ReviewService {
 
     // عام: أي زائر يقدر يشوف التقييمات المعتمدة فقط لملعب معين
     public List<ReviewResponse> getStadiumReviews(Long stadiumId) {
+        Stadium stadium = stadiumRepository.findById(stadiumId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Stadium not found"));
+        stadiumService.assertStadiumViewable(stadium);
+
         return reviewRepository.findByStadiumIdAndStatusOrderByCreatedAtDesc(stadiumId, ReviewStatus.APPROVED)
                 .stream()
                 .map(this::toResponse)

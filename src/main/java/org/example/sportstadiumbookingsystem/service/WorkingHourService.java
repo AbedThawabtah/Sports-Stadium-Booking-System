@@ -26,6 +26,7 @@ public class WorkingHourService {
     private final WorkingHourRepository workingHourRepository;
     private final StadiumRepository stadiumRepository;
     private final UserRepository userRepository;
+    private final StadiumService stadiumService;
 
     @Transactional
     public List<WorkingHourResponse> setWorkingHours(Long stadiumId, List<WorkingHourRequest> requests) {
@@ -85,7 +86,8 @@ public class WorkingHourService {
     }
 
     public List<WorkingHourResponse> getWorkingHours(Long stadiumId) {
-        findStadiumOrThrow(stadiumId); // للتأكد إن الملعب موجود أصلاً
+        Stadium stadium = findStadiumOrThrow(stadiumId);
+        stadiumService.assertStadiumViewable(stadium);
         return workingHourRepository.findByStadiumIdOrderByDayOfWeekAsc(stadiumId)
                 .stream()
                 .map(this::toResponse)
