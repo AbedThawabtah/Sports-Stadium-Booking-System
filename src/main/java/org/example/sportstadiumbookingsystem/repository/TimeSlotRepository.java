@@ -10,4 +10,5 @@ import java.util.List;
 public interface TimeSlotRepository extends JpaRepository<TimeSlot, Long> {
     List<TimeSlot> findByStadiumIdAndSlotDateOrderByStartTimeAsc(Long stadiumId, LocalDate slotDate);
     List<TimeSlot> findByStadiumIdAndSlotDateAndStatusOrderByStartTimeAsc(Long stadiumId, LocalDate slotDate, SlotStatus status);
+    void deleteByStadiumId(Long stadiumId);
 }

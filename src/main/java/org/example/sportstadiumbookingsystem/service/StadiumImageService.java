@@ -1,6 +1,7 @@
 package org.example.sportstadiumbookingsystem.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.example.sportstadiumbookingsystem.dto.stadiumimage.StadiumImageResponse;
 import org.example.sportstadiumbookingsystem.entity.Stadium;
 import org.example.sportstadiumbookingsystem.entity.StadiumImage;
@@ -20,6 +21,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class StadiumImageService {
 
     private static final int MAX_IMAGES_PER_STADIUM = 10;
@@ -50,17 +52,30 @@ public class StadiumImageService {
         boolean hasPrimaryAlready = stadiumImageRepository.findByStadiumIdAndIsPrimaryTrue(stadiumId).isPresent();
 
         List<StadiumImage> saved = new ArrayList<>();
-        for (int i = 0; i < files.size(); i++) {
-            String url = fileStorageService.store(files.get(i));
-            boolean isPrimary = !hasPrimaryAlready && i == 0;
+        List<String> storedUrls = new ArrayList<>();
+        try {
+            for (int i = 0; i < files.size(); i++) {
+                String url = fileStorageService.store(files.get(i));
+                storedUrls.add(url);
+                boolean isPrimary = !hasPrimaryAlready && i == 0;
 
-            StadiumImage image = StadiumImage.builder()
-                    .stadium(stadium)
-                    .imageUrl(url)
-                    .isPrimary(isPrimary)
-                    .build();
+                StadiumImage image = StadiumImage.builder()
+                        .stadium(stadium)
+                        .imageUrl(url)
+                        .isPrimary(isPrimary)
+                        .build();
 
-            saved.add(stadiumImageRepository.save(image));
+                saved.add(stadiumImageRepository.save(image));
+            }
+        } catch (Exception e) {
+            for (String url : storedUrls) {
+                try {
+                    fileStorageService.delete(url);
+                } catch (Exception cleanupEx) {
+                    log.warn("Failed to clean up stored file {} after upload failure", url, cleanupEx);
+                }
+            }
+            throw e;
         }
 
         activityLogService.log(currentUser, "STADIUM_IMAGES_UPLOADED", "Stadium", stadium.getId(),
@@ -106,8 +121,12 @@ public class StadiumImageService {
         StadiumImage image = findImageOrThrow(imageId, stadiumId);
         boolean wasPrimary = Boolean.TRUE.equals(image.getIsPrimary());
 
-        fileStorageService.delete(image.getImageUrl());
         stadiumImageRepository.delete(image);
+        try {
+            fileStorageService.delete(image.getImageUrl());
+        } catch (Exception e) {
+            log.warn("Failed to delete physical file for removed image {}", image.getImageUrl(), e);
+        }
 
         // إذا حذفنا الصورة الرئيسية، نخلي أقدم صورة متبقية هي الرئيسية
         if (wasPrimary) {

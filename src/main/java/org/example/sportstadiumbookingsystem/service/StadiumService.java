@@ -2,17 +2,22 @@ package org.example.sportstadiumbookingsystem.service;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.example.sportstadiumbookingsystem.dto.stadium.MyStadiumResponse;
 import org.example.sportstadiumbookingsystem.dto.stadium.StadiumRequest;
 import org.example.sportstadiumbookingsystem.dto.stadium.StadiumResponse;
 import org.example.sportstadiumbookingsystem.entity.Stadium;
+import org.example.sportstadiumbookingsystem.entity.StadiumImage;
 import org.example.sportstadiumbookingsystem.entity.User;
 import org.example.sportstadiumbookingsystem.entityEnums.ReservationStatus;
 import org.example.sportstadiumbookingsystem.entityEnums.StadiumStatus;
 import org.example.sportstadiumbookingsystem.entityEnums.UserRole;
 import org.example.sportstadiumbookingsystem.repository.ReservationRepository;
+import org.example.sportstadiumbookingsystem.repository.StadiumImageRepository;
 import org.example.sportstadiumbookingsystem.repository.StadiumRepository;
+import org.example.sportstadiumbookingsystem.repository.TimeSlotRepository;
 import org.example.sportstadiumbookingsystem.repository.UserRepository;
+import org.example.sportstadiumbookingsystem.repository.WorkingHourRepository;
 import org.example.sportstadiumbookingsystem.specification.StadiumSpecifications;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -28,12 +33,17 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class StadiumService {
 
     private final StadiumRepository stadiumRepository;
     private final UserRepository userRepository;
     private final ActivityLogService activityLogService;
     private final ReservationRepository reservationRepository;
+    private final TimeSlotRepository timeSlotRepository;
+    private final WorkingHourRepository workingHourRepository;
+    private final StadiumImageRepository stadiumImageRepository;
+    private final FileStorageService fileStorageService;
 
     public StadiumResponse createStadium(StadiumRequest request) {
         User owner = getCurrentUser();
@@ -139,6 +149,7 @@ public class StadiumService {
         return toResponse(updated);
     }
 
+    @Transactional
     public void deleteStadium(Long id) {
         Stadium stadium = findStadiumOrThrow(id);
         User currentUser = getCurrentUser();
@@ -150,7 +161,28 @@ public class StadiumService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied");
         }
 
+        if (reservationRepository.countByStadiumId(id) > 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Cannot delete a stadium with existing reservations. Historical reservation data must be preserved.");
+        }
+
+        List<String> imageUrls = stadiumImageRepository.findByStadiumId(id)
+                .stream()
+                .map(StadiumImage::getImageUrl)
+                .toList();
+
+        timeSlotRepository.deleteByStadiumId(id);
+        workingHourRepository.deleteByStadiumId(id);
+        stadiumImageRepository.deleteByStadiumId(id);
         stadiumRepository.delete(stadium);
+
+        for (String imageUrl : imageUrls) {
+            try {
+                fileStorageService.delete(imageUrl);
+            } catch (Exception e) {
+                log.warn("Failed to delete physical file for image {} of deleted stadium {}", imageUrl, id, e);
+            }
+        }
     }
 
     // ─── Helper methods ────────────────────────────────────────────

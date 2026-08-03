@@ -11,4 +11,5 @@ public interface StadiumImageRepository extends JpaRepository<StadiumImage, Long
     List<StadiumImage> findByStadiumIdOrderByIsPrimaryDescCreatedAtAsc(Long stadiumId);
     Optional<StadiumImage> findByStadiumIdAndIsPrimaryTrue(Long stadiumId);
     long countByStadiumId(Long stadiumId);
+    void deleteByStadiumId(Long stadiumId);
 }
